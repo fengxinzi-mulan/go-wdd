@@ -2,6 +2,8 @@
 
 本系统用于把 **115 网盘** 的文件以 **WebDAV** 的方式对外提供访问，并配套一个 **可视化管理后台**，用于完成登录、挂载目录选择、同步索引、WebDAV 账号授权、直链与 STRM 生成等日常运维操作。
 <br>
+TG：[https://t.me/+PMcRbtFFYvBjZWY9](https://t.me/+PMcRbtFFYvBjZWY9)
+<br>
 Github地址：[https://github.com/fengxinzi-mulan/go-wdd](https://github.com/fengxinzi-mulan/go-wdd)
 
 ---
