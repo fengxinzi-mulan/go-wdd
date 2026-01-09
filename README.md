@@ -1,6 +1,8 @@
 # WebDAV 虚拟网盘管理系统（go-webdav-virtual）
 
 本系统用于把 **115 网盘** 的文件以 **WebDAV** 的方式对外提供访问，并配套一个 **可视化管理后台**，用于完成登录、挂载目录选择、同步索引、WebDAV 账号授权、直链与 STRM 生成等日常运维操作。
+<br>
+Github地址：[https://github.com/fengxinzi-mulan/go-wdd](https://github.com/fengxinzi-mulan/go-wdd)
 
 ---
 
@@ -43,12 +45,81 @@
 
 ---
 
+### 部署方式
+
+#### Docker 部署
+
+##### 方式一：使用 docker run
+
+```bash
+docker run -d \
+  --name go-wdd \
+  -p 5574:5574 \
+  -p 5575:5575 \
+  -v /path/to/static:/app/static \
+  -v /path/to/data:/app/data \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  wbyanzu/go-wdd:latest
+```
+
+参数说明：
+
+
+> **说明**：
+> - `-p 5574:5574`：管理后台/API 端口
+> - `-p 5575:5575`：代理端口（用于 Emby 外网 302 代理等能力，详见 STRM 设置）
+> - 程序默认会在 `/app/data` 下创建 `data.db`（SQLite）
+> - STRM 默认生成到程序目录的 `/app/static/strm`
+
+##### 方式二：使用 docker compose（推荐）
+
+```yaml
+services:
+  go-wdd:
+    image: wbyanzu/go-wdd:latest
+    container_name: go-wdd
+    restart: unless-stopped
+    ports:
+      - "5574:5574"
+      - "5575:5575"
+    volumes:
+      - ./static:/app/static
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+```
+
+启动服务：
+
+```bash
+docker compose up -d
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+查看日志：
+
+```bash
+docker compose logs -f go-wdd
+```
+
+---
+
 ### 快速开始（用户上手）
 
 #### 1) 启动服务
 
+**Docker 部署**：参考上方 [部署方式](#部署方式) 章节
+
+**直接运行**：
+
 - **Windows**：运行 `go-webdav-virtual.exe`
-- **Linux**：运行 `./go-webdav-virtual`
+- **Linux**：参考上方 [部署方式](#部署方式) 章节
 - **首次启动会创建本地数据库**：`data.db`（建议做好备份）
 
 #### 2) 打开管理后台
@@ -123,6 +194,47 @@ STRM 是一种“指向真实播放地址的文本文件”。本系统会把网
 生成结果位置：
 
 - 程序目录下：`static/strm/`
+
+---
+
+### Emby 代理（5575 端口）：外网播放走 302 直链
+
+如果你希望 **访问 Emby 时播放不走 Emby 中转**（减少服务器带宽/负载），可以使用本程序提供的 **Emby 代理端口 `5575`**：
+
+- **你访问的 Emby 地址**：`http://<本程序IP>:5575`（或你反代后的外网域名）
+- **播放时的实际行为**：客户端请求播放 → 代理在关键接口上做处理 → **返回 302 跳转到 115 的真实下载直链**，客户端直接拉取网盘直链播放
+
+#### 1) 前置条件
+
+- 你已经在本系统完成一次“同步”，并生成了 STRM（详见上方 STRM 章节）
+- Emby 媒体库指向了 STRM 文件目录
+  - 例如把本程序生成的 `static/strm/` 映射/挂载到 Emby 容器或宿主机目录后，让 Emby 扫描该目录
+
+#### 2) 在本系统里开启/配置 Emby 代理
+
+进入后台 **STRM 设置**，填写并保存：
+
+- **Emby 地址（必填）**：Emby 服务的“内网可达地址”，例如 `http://192.168.1.100:8096`
+  - 说明：这是给本程序用于反向代理的目标地址，所以 **本程序必须能访问到它**
+
+保存后，程序会启动代理服务（端口固定为 `5575`）。
+
+#### 3) 使用方式
+
+- **内网访问 Emby**：你可以继续用原来的 Emby 地址（例如 `http://192.168.1.100:8096`）
+- **外网访问 Emby（想要 302 直链播放）**：请用 **代理地址**访问 Emby：`http://<本程序IP>:5575`
+  - 关键点：**只有“通过 5575 进入的播放请求”才会被代理接管并触发 302**
+
+#### 4) 如何验证是否生效
+
+- 用浏览器/Emby 客户端通过 `http://<本程序IP>:5575` 打开 Emby，选择一部来自 STRM 的视频播放
+- 如果生效，播放请求会出现 **302 跳转**，最终拉取的是 115 的真实下载直链（不会走 Emby 的转码/中转链路）
+
+#### 5) 常见注意事项
+
+- **转码不会 302**：该功能面向“直通/直播”场景；如果客户端触发了转码，流量仍会走 Emby
+- **Docker/网络**：如果你用 Docker 部署，确保本程序容器能访问到你填写的 Emby 地址（同网段/正确的容器网络）
+- **安全建议**：`5575` 等同于“Emby 的外网入口”，建议配合反代、HTTPS、访问控制（白名单/VPN）再对公网开放
 
 ---
 
